@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rawimagetoPrompt — Vision to Text</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;700;800&display=swap" rel="stylesheet">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --purple-50: #EEEDFE;
+    --purple-100: #CECBF6;
+    --purple-400: #7F77DD;
+    --purple-600: #534AB7;
+    --purple-800: #3C3489;
+    --purple-900: #26215C;
+    --ink: #0D0C1A;
+    --ink-muted: #4A4865;
+    --ink-faint: #9896B0;
+    --surface: #F7F6FF;
+    --white: #FFFFFF;
+    --border: rgba(83,74,183,0.12);
+    --border-mid: rgba(83,74,183,0.22);
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--white);
+    color: var(--ink);
+    overflow-x: hidden;
+  }
+
+  /* ─── NAV ─── */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 3rem;
+    height: 68px;
+    background: rgba(255,255,255,0.82);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  .nav-logo {
+    font-family: 'Instrument Serif', serif;
+    font-size: 22px;
+    font-style: italic;
+    color: var(--ink);
+    letter-spacing: -0.3px;
+    text-decoration: none;
+  }
+
+  .nav-logo span {
+    color: var(--purple-600);
+    font-style: normal;
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 2.5rem;
+    list-style: none;
+  }
+
+  .nav-links a {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-muted);
+    text-decoration: none;
+    letter-spacing: 0.03em;
+    transition: color 0.2s;
+  }
+
+  .nav-links a:hover { color: var(--purple-600); }
+
+  .nav-cta {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    background: var(--ink);
+    color: var(--white) !important;
+    padding: 9px 20px;
+    border-radius: 999px;
+    transition: background 0.2s !important;
+  }
+
+  .nav-cta:hover { background: var(--purple-600) !important; color: var(--white) !important; }
+
+  /* ─── HERO ─── */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 120px 2rem 80px;
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+  }
+
+  /* subtle grid bg */
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 60px 60px;
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  /* radial glow */
+  .hero::after {
+    content: '';
+    position: absolute;
+    top: 10%; left: 50%;
+    transform: translateX(-50%);
+    width: 700px; height: 500px;
+    background: radial-gradient(ellipse, rgba(127,119,221,0.18) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--purple-600);
+    background: var(--purple-50);
+    border: 0.5px solid var(--purple-100);
+    border-radius: 999px;
+    padding: 6px 16px;
+    margin-bottom: 2.5rem;
+    position: relative;
+    z-index: 1;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  .badge-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--purple-400);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .hero-logo {
+    font-family: 'Instrument Serif', serif;
+    font-size: clamp(52px, 9vw, 96px);
+    font-weight: 400;
+    line-height: 1.0;
+    letter-spacing: -2px;
+    color: var(--ink);
+    position: relative;
+    z-index: 1;
+    animation: fadeUp 0.6s 0.1s ease both;
+  }
+
+  .hero-logo em {
+    color: var(--purple-600);
+    font-style: italic;
+  }
+
+  .hero-logo .mono-part {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.52em;
+    letter-spacing: -1px;
+    color: var(--ink-faint);
+    display: block;
+    margin-top: 4px;
+  }
+
+  .hero-sub {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(16px, 2.2vw, 20px);
+    font-weight: 400;
+    color: var(--ink-muted);
+    max-width: 540px;
+    line-height: 1.65;
+    margin-top: 2rem;
+    position: relative;
+    z-index: 1;
+    animation: fadeUp 0.6s 0.2s ease both;
+  }
+
+  .hero-sub strong {
+    color: var(--ink);
+    font-weight: 700;
+  }
+
+  .hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 3rem;
+    position: relative;
+    z-index: 1;
+    animation: fadeUp 0.6s 0.3s ease both;
+  }
+
+  .btn-primary {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    background: var(--purple-600);
+    color: var(--white);
+    padding: 14px 32px;
+    border-radius: 999px;
+    text-decoration: none;
+    transition: background 0.2s, transform 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-primary:hover { background: var(--purple-800); transform: translateY(-1px); }
+
+  .btn-ghost {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--ink-muted);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.2s;
+  }
+
+  .btn-ghost:hover { color: var(--purple-600); }
+
+  /* hero visual demo */
+  .hero-demo {
+    position: relative;
+    z-index: 1;
+    margin-top: 5rem;
+    width: 100%;
+    max-width: 760px;
+    animation: fadeUp 0.7s 0.45s ease both;
+  }
+
+  .demo-window {
+    background: var(--white);
+    border: 0.5px solid var(--border-mid);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 24px 80px rgba(83,74,183,0.12), 0 4px 16px rgba(0,0,0,0.05);
+  }
+
+  .demo-bar {
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--border);
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .d1 { background: #FF6058; }
+  .d2 { background: #FFC130; }
+  .d3 { background: #28CA42; }
+
+  .demo-url {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-faint);
+    margin-left: 12px;
+  }
+
+  .demo-body {
+    padding: 2rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .demo-left {
+    background: var(--surface);
+    border: 1.5px dashed var(--border-mid);
+    border-radius: 12px;
+    height: 180px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .demo-img-icon {
+    width: 48px; height: 48px;
+    background: var(--purple-50);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .demo-img-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-faint);
+  }
+
+  .demo-right {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .demo-prompt-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--purple-400);
+    text-transform: uppercase;
+  }
+
+  .demo-prompt-text {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-muted);
+    line-height: 1.75;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+  }
+
+  .demo-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .demo-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    background: var(--purple-50);
+    color: var(--purple-600);
+    border-radius: 999px;
+    padding: 3px 10px;
+    border: 0.5px solid var(--purple-100);
+  }
+
+  /* ─── FEATURES ─── */
+  .section {
+    padding: 100px 3rem;
+    max-width: 1160px;
+    margin: 0 auto;
+  }
+
+  .section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--purple-400);
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+
+  .section-title {
+    font-family: 'Instrument Serif', serif;
+    font-size: clamp(36px, 5vw, 56px);
+    line-height: 1.1;
+    letter-spacing: -1px;
+    color: var(--ink);
+    max-width: 600px;
+  }
+
+  .section-title em { font-style: italic; color: var(--purple-600); }
+
+  .section-body {
+    font-size: 17px;
+    color: var(--ink-muted);
+    line-height: 1.7;
+    max-width: 520px;
+    margin-top: 1.25rem;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5px;
+    margin-top: 5rem;
+    border: 1.5px solid var(--border-mid);
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--border-mid);
+  }
+
+  .feature-card {
+    background: var(--white);
+    padding: 2.5rem 2rem;
+    transition: background 0.2s;
+  }
+
+  .feature-card:hover { background: var(--surface); }
+
+  .feature-icon {
+    width: 44px; height: 44px;
+    background: var(--purple-50);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 1.25rem;
+  }
+
+  .feature-icon svg { width: 20px; height: 20px; stroke: var(--purple-600); }
+
+  .feature-title {
+    font-family: 'Instrument Serif', serif;
+    font-size: 22px;
+    font-style: italic;
+    color: var(--ink);
+    margin-bottom: 0.5rem;
+  }
+
+  .feature-desc {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+    line-height: 1.7;
+  }
+
+  /* ─── HOW IT WORKS ─── */
+  .steps-wrap {
+    margin-top: 5rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+  }
+
+  .steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .step-item {
+    display: flex;
+    gap: 1.5rem;
+    padding: 2rem 0;
+    border-bottom: 0.5px solid var(--border);
+    align-items: flex-start;
+  }
+
+  .step-item:first-child { padding-top: 0; }
+  .step-item:last-child { border-bottom: none; }
+
+  .step-num {
+    font-family: 'Instrument Serif', serif;
+    font-size: 42px;
+    font-style: italic;
+    color: var(--purple-100);
+    line-height: 1;
+    min-width: 44px;
+    user-select: none;
+  }
+
+  .step-content {}
+
+  .step-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+
+  .step-desc {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+    line-height: 1.7;
+  }
+
+  .steps-visual {
+    background: var(--surface);
+    border: 0.5px solid var(--border-mid);
+    border-radius: 16px;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .output-tab-row {
+    display: flex;
+    gap: 6px;
+  }
+
+  .output-tab {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 0.5px solid var(--border-mid);
+    color: var(--ink-faint);
+    background: var(--white);
+  }
+
+  .output-tab.active {
+    background: var(--purple-600);
+    color: var(--white);
+    border-color: transparent;
+  }
+
+  .output-box {
+    background: var(--white);
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-muted);
+    line-height: 1.8;
+  }
+
+  .output-tags-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  /* ─── STYLES SECTION ─── */
+  .styles-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1rem;
+    margin-top: 3.5rem;
+  }
+
+  .style-card {
+    border: 0.5px solid var(--border-mid);
+    border-radius: 12px;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    cursor: default;
+    transition: border-color 0.2s, transform 0.2s;
+    background: var(--white);
+  }
+
+  .style-card:hover { border-color: var(--purple-400); transform: translateY(-2px); }
+
+  .style-card-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    margin: 0 auto 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+
+  .style-card-name {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+
+  .style-card-desc {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-faint);
+    line-height: 1.5;
+  }
+
+  /* ─── CTA ─── */
+  .cta-section {
+    margin: 0 3rem 100px;
+    background: var(--ink);
+    border-radius: 24px;
+    padding: 80px 3rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cta-section::before {
+    content: '';
+    position: absolute;
+    top: -50%; left: 50%;
+    transform: translateX(-50%);
+    width: 600px; height: 400px;
+    background: radial-gradient(ellipse, rgba(127,119,221,0.35) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .cta-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--purple-400);
+    text-transform: uppercase;
+    margin-bottom: 1.25rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .cta-title {
+    font-family: 'Instrument Serif', serif;
+    font-size: clamp(36px, 5vw, 60px);
+    line-height: 1.1;
+    letter-spacing: -1px;
+    color: var(--white);
+    max-width: 600px;
+    margin: 0 auto 1.5rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .cta-title em { color: var(--purple-400); font-style: italic; }
+
+  .cta-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: rgba(255,255,255,0.45);
+    margin-bottom: 2.5rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .cta-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .btn-white {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    background: var(--white);
+    color: var(--ink);
+    padding: 14px 32px;
+    border-radius: 999px;
+    text-decoration: none;
+    transition: background 0.2s, transform 0.15s;
+  }
+
+  .btn-white:hover { background: var(--purple-50); transform: translateY(-1px); }
+
+  /* ─── FOOTER ─── */
+  footer {
+    border-top: 0.5px solid var(--border);
+    padding: 2.5rem 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .footer-logo {
+    font-family: 'Instrument Serif', serif;
+    font-size: 18px;
+    font-style: italic;
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .footer-logo span { color: var(--purple-600); font-style: normal; }
+
+  .footer-note {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-faint);
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 2rem;
+    list-style: none;
+  }
+
+  .footer-links a {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-faint);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  .footer-links a:hover { color: var(--purple-600); }
+
+  /* ─── ANIMATIONS ─── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity 0.65s ease, transform 0.65s ease;
+  }
+
+  .reveal.in { opacity: 1; transform: none; }
+
+  @media (max-width: 900px) {
+    nav { padding: 0 1.5rem; }
+    .nav-links { display: none; }
+    .section { padding: 70px 1.5rem; }
+    .features-grid { grid-template-columns: 1fr; }
+    .steps-wrap { grid-template-columns: 1fr; }
+    .styles-grid { grid-template-columns: repeat(2, 1fr); }
+    .cta-section { margin: 0 1.5rem 60px; padding: 60px 1.5rem; }
+    footer { flex-direction: column; gap: 1.5rem; text-align: center; }
+    .demo-body { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">raw<span>image</span>toPrompt</a>
+  <ul class="nav-links">
+    <li><a href="#features">features</a></li>
+    <li><a href="#how">how it works</a></li>
+    <li><a href="#styles">prompt styles</a></li>
+    <li><a href="#" class="nav-cta">try free →</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">
+    <div class="badge-dot"></div>
+    powered by claude vision
+  </div>
+
+  <h1 class="hero-logo">
+    raw<em>image</em>toPrompt
+    <span class="mono-part">// vision → text → generation</span>
+  </h1>
+
+  <p class="hero-sub">
+    Upload any image. Get a <strong>studio-grade AI prompt</strong> back in seconds — optimized for Midjourney, FLUX, Stable Diffusion, DALL·E, and more.
+  </p>
+
+  <div class="hero-actions">
+    <a href="#" class="btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      start generating
+    </a>
+    <a href="#how" class="btn-ghost">see how it works →</a>
+  </div>
+
+  <!-- demo window -->
+  <div class="hero-demo">
+    <div class="demo-window">
+      <div class="demo-bar">
+        <div class="dot d1"></div>
+        <div class="dot d2"></div>
+        <div class="dot d3"></div>
+        <span class="demo-url">rawimageToprompt.app</span>
+      </div>
+      <div class="demo-body">
+        <div class="demo-left">
+          <div class="demo-img-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7F77DD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="3"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </div>
+          <div class="demo-img-label">drop image here</div>
+        </div>
+        <div class="demo-right">
+          <div class="demo-prompt-label">generated prompt</div>
+          <div class="demo-prompt-text">A cinematic wide-angle shot of a misty mountain valley at golden hour, dramatic volumetric light rays piercing through ancient pine trees, photorealistic 8K, shot on Hasselblad...</div>
+          <div class="demo-tags">
+            <div class="demo-tag">cinematic</div>
+            <div class="demo-tag">golden hour</div>
+            <div class="demo-tag">8K</div>
+            <div class="demo-tag">photorealistic</div>
+            <div class="demo-tag">landscape</div>
+            <div class="demo-tag">volumetric</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section" id="features">
+  <div class="reveal">
+    <div class="section-label">what you get</div>
+    <h2 class="section-title">Every detail, <em>extracted</em></h2>
+    <p class="section-body">Claude's vision model dissects composition, lighting, style, mood, and technique — turning any image into a reproduction-ready prompt.</p>
+  </div>
+
+  <div class="features-grid reveal" style="transition-delay:0.1s">
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          <path d="M11 8v6M8 11h6"/>
+        </svg>
+      </div>
+      <div class="feature-title">Deep analysis</div>
+      <div class="feature-desc">Subject, composition, lighting, color palette, mood, artistic style, and technical qualities — all captured.</div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+      </div>
+      <div class="feature-title">Multi-format output</div>
+      <div class="feature-desc">Full prompt, short version, keyword tags, and negative prompt — ready for any workflow.</div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+      </div>
+      <div class="feature-title">Generator-optimized</div>
+      <div class="feature-desc">Prompts are tailored per generator — Midjourney syntax, SDXL emphasis, DALL·E natural language, FLUX style.</div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+        </svg>
+      </div>
+      <div class="feature-title">Detail levels</div>
+      <div class="feature-desc">Choose from concise to ultra-verbose (400+ words) depending on how precise you need the recreation to be.</div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>
+        </svg>
+      </div>
+      <div class="feature-title">Keyword tags</div>
+      <div class="feature-desc">Scan-ready tag cloud for quick reference, mixing, or plugging into other tools.</div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+        </svg>
+      </div>
+      <div class="feature-title">Instant results</div>
+      <div class="feature-desc">Analysis completes in under 5 seconds. No queues, no waiting, no rate limits on basic usage.</div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section" id="how" style="padding-top:0">
+  <div class="reveal">
+    <div class="section-label">process</div>
+    <h2 class="section-title">Three steps to <em>any</em> prompt</h2>
+  </div>
+
+  <div class="steps-wrap reveal" style="transition-delay:0.15s">
+    <div class="steps-list">
+      <div class="step-item">
+        <div class="step-num">01</div>
+        <div class="step-content">
+          <div class="step-title">Drop your image</div>
+          <div class="step-desc">Drag and drop or click to upload any image — PNG, JPG, WEBP, or GIF up to 10 MB. No account needed to start.</div>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">02</div>
+        <div class="step-content">
+          <div class="step-title">Choose your settings</div>
+          <div class="step-desc">Pick your target generator and detail level. The prompt engine adjusts syntax, emphasis, and vocabulary accordingly.</div>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">03</div>
+        <div class="step-content">
+          <div class="step-title">Copy and create</div>
+          <div class="step-desc">Get your full prompt, short version, tags, and negative prompt. One click to copy, then paste into your AI tool of choice.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="steps-visual">
+      <div class="output-tab-row">
+        <div class="output-tab active">full prompt</div>
+        <div class="output-tab">short ver.</div>
+        <div class="output-tab">tags</div>
+        <div class="output-tab">negative</div>
+      </div>
+      <div class="output-box">
+        A hyperrealistic portrait of a young woman with silver hair and amber eyes, dramatic rim lighting from the left, shallow depth of field, 85mm f/1.4 lens, editorial fashion photography, muted earth tones, Leica M11, award-winning, ultra-detailed skin texture, 8K resolution --ar 2:3 --v 6 --q 2
+      </div>
+      <div class="output-tags-row">
+        <div class="demo-tag">portrait</div>
+        <div class="demo-tag">silver hair</div>
+        <div class="demo-tag">rim lighting</div>
+        <div class="demo-tag">editorial</div>
+        <div class="demo-tag">85mm</div>
+        <div class="demo-tag">f/1.4</div>
+        <div class="demo-tag">8K</div>
+        <div class="demo-tag">hyperrealistic</div>
+        <div class="demo-tag">Leica</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STYLES -->
+<section class="section" id="styles" style="padding-top:0">
+  <div class="reveal">
+    <div class="section-label">supported generators</div>
+    <h2 class="section-title">Built for <em>every</em> platform</h2>
+    <p class="section-body">Each style mode uses generator-specific syntax and vocabulary, not just generic descriptions.</p>
+  </div>
+
+  <div class="styles-grid reveal" style="transition-delay:0.1s">
+    <div class="style-card">
+      <div class="style-card-icon" style="background:#EEF2FF;">🎨</div>
+      <div class="style-card-name">Midjourney</div>
+      <div class="style-card-desc">v6 syntax with weight params and --ar flags</div>
+    </div>
+    <div class="style-card">
+      <div class="style-card-icon" style="background:#FFF7ED;">⚡</div>
+      <div class="style-card-name">FLUX</div>
+      <div class="style-card-desc">Natural language, richly descriptive</div>
+    </div>
+    <div class="style-card">
+      <div class="style-card-icon" style="background:#F0FDF4;">🖼</div>
+      <div class="style-card-name">Stable Diffusion</div>
+      <div class="style-card-desc">SDXL with parentheses emphasis notation</div>
+    </div>
+    <div class="style-card">
+      <div class="style-card-icon" style="background:#FFF1F2;">✦</div>
+      <div class="style-card-name">DALL·E</div>
+      <div class="style-card-desc">Descriptive prose for OpenAI's model</div>
+    </div>
+    <div class="style-card">
+      <div class="style-card-icon" style="background:#FAFAF9;">◈</div>
+      <div class="style-card-name">Universal</div>
+      <div class="style-card-desc">Works across any major generator</div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-section reveal">
+  <div class="cta-label">get started free</div>
+  <h2 class="cta-title">Your image already has a <em>prompt inside it</em></h2>
+  <p class="cta-sub">No signup needed. Drop an image and see what Claude finds.</p>
+  <div class="cta-actions">
+    <a href="#" class="btn-white">try rawimagetoPrompt →</a>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <a href="#" class="footer-logo">raw<span>image</span>toPrompt</a>
+  <p class="footer-note">© 2026 — powered by Claude Vision</p>
+  <ul class="footer-links">
+    <li><a href="#">privacy</a></li>
+    <li><a href="#">terms</a></li>
+    <li><a href="#">contact</a></li>
+  </ul>
+</footer>
+
+<script>
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((e, i) => {
+      if (e.isIntersecting) {
+        const delay = parseFloat(e.target.style.transitionDelay) || 0;
+        setTimeout(() => e.target.classList.add('in'), delay * 1000);
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12 });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
